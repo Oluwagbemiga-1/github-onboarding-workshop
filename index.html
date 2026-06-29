@@ -821,10 +821,18 @@
   <!-- SUBMISSIONS TRACKER -->
   <section id="submissions">
     <div class="section-title">📝 Assignment Submissions</div>
-    <p style="color:var(--muted);font-size:0.875rem;margin-bottom:20px;">
-      Submissions are loaded live from the GitHub repo. Each card updates automatically when a Pull Request is merged.
-      Files should be named <code style="background:var(--card);padding:2px 6px;border-radius:4px;color:var(--accent2);">topic-firstname-lastname.md</code>
-    </p>
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:16px;">
+      <p style="color:var(--muted);font-size:0.875rem;margin:0;">
+        Submissions load live from GitHub. Each card updates when a Pull Request is merged.
+        Files should be named <code style="background:var(--card);padding:2px 6px;border-radius:4px;color:var(--accent2);">topic-firstname-lastname.md</code>
+      </p>
+      <button onclick="refreshSubmissions()" id="refresh-btn" style="
+        background:var(--accent1);color:#fff;border:none;border-radius:8px;
+        padding:8px 18px;font-size:0.82rem;font-weight:700;cursor:pointer;
+        display:flex;align-items:center;gap:6px;transition:opacity 0.2s;">
+        🔄 Refresh
+      </button>
+    </div>
     <div class="cards-grid" id="submissions-grid">
       <div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);font-size:0.9rem;">
         Loading submissions from GitHub...
@@ -1034,9 +1042,15 @@ function cleanName(filename) {
 }
 
 async function loadSession(session) {
-  const url = API + session.folder + '?ref=' + BRANCH;
   try {
-    const res = await fetch(url, { headers: { 'Accept': 'application/vnd.github.v3+json' } });
+    const bust = '&t=' + Date.now();
+    const res = await fetch(API + session.folder + '?ref=' + BRANCH + bust, {
+      headers: {
+        'Accept': 'application/vnd.github.v3+json',
+        'Cache-Control': 'no-cache'
+      },
+      cache: 'no-store'
+    });
     if (!res.ok) throw new Error('fetch failed');
     const files = await res.json();
 
@@ -1096,11 +1110,19 @@ function renderCard({ session, submissions }) {
 async function loadAllSubmissions() {
   const grid = document.getElementById('submissions-grid');
   if (!grid) return;
+  grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:40px;color:var(--muted);font-size:0.9rem;">Loading submissions from GitHub...</div>';
 
-  // Load all sessions in parallel
+  // Load all sessions in parallel — no caching
   const results = await Promise.all(SESSIONS.map(loadSession));
-
   grid.innerHTML = results.map(renderCard).join('');
+}
+
+function refreshSubmissions() {
+  const btn = document.getElementById('refresh-btn');
+  if (btn) { btn.textContent = '⏳ Refreshing...'; btn.disabled = true; }
+  loadAllSubmissions().then(() => {
+    if (btn) { btn.innerHTML = '🔄 Refresh'; btn.disabled = false; }
+  });
 }
 
 document.addEventListener('DOMContentLoaded', loadAllSubmissions);
